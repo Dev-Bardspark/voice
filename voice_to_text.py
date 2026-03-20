@@ -47,7 +47,6 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onend = function() {
         document.getElementById('status').innerHTML = '⏹️ Stopped';
         if (finalTranscript) {
-            // Send to Streamlit
             window.parent.postMessage({
                 type: 'streamlit:setComponentValue',
                 value: finalTranscript.trim()
@@ -90,11 +89,10 @@ st.header="📤 OUTPUT (for your other app)")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader="Current Transcript Value"
+    st.subheader("Current Transcript Value")
     st.code(f"st.session_state.transcript = '{st.session_state.transcript}'")
     
-    # Show how to access it
-    st.subheader="How to use in your app"
+    st.subheader="How to use in your app")
     st.code("""
 # In your other app, just use:
 transcript = st.session_state.transcript
@@ -104,7 +102,7 @@ if transcript:
     """, language="python")
 
 with col2:
-    st.subheader="Live Preview"
+    st.subheader="Live Preview")
     if st.session_state.transcript:
         st.success(f"📝 You said: {st.session_state.transcript}")
     else:
