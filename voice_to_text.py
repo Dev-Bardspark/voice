@@ -4,7 +4,6 @@ from audio_recorder_streamlit import audio_recorder
 import tempfile
 import os
 from datetime import datetime
-import pandas as pd
 
 st.set_page_config(
     page_title="Speech to Text",
@@ -12,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize session state
+# ====================== SESSION STATE ======================
 if "transcript" not in st.session_state:
     st.session_state.transcript = ""
 if "history" not in st.session_state:
@@ -20,56 +19,59 @@ if "history" not in st.session_state:
 if "recording_count" not in st.session_state:
     st.session_state.recording_count = 0
 
-st.title="🎤 Speech to Text Converter")
+# ====================== TITLE ======================
+st.title("🎤 Speech to Text Converter")
 st.markdown("---")
 
-# Sidebar
+# ====================== SIDEBAR ======================
 with st.sidebar:
-    st.header="📊 Stats")
+    st.header("📊 Stats")
     st.metric("Total Recordings", st.session_state.recording_count)
-    st.metric="Transcript Length", len(st.session_state.transcript))
+    st.metric("Transcript Length", len(st.session_state.transcript))
     
-    st.markdown="---")
-    st.header="ℹ️ Instructions")
+    st.markdown("---")
+    st.header("ℹ️ Instructions")
     st.markdown("""
-    1. Click microphone button
+    1. Click the microphone button
     2. Allow microphone access
     3. Speak clearly
-    4. Click button again to stop
-    5. Text appears below
+    4. Click the button again to stop
+    5. Wait for transcription
     """)
 
-# Main content
-col1, col2 = st.columns(2)
+# ====================== MAIN CONTENT ======================
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader="🎙️ Record Audio")
+    st.subheader("🎙️ Record Audio")
     
     audio_bytes = audio_recorder(
         text="Click to record",
         recording_color="#ff4b4b",
         neutral_color="#6c757d",
-        icon_size="4x"
+        icon_size="4x",
+        key="audio_recorder_key"   # Important: helps with re-renders
     )
-    
+
     if audio_bytes:
         st.audio(audio_bytes, format="audio/wav")
-        
-        with st.spinner("Converting to text..."):
+
+        with st.spinner("🎙️ Converting speech to text..."):
             try:
-                # Save temp file
+                # Save audio to temporary file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
                     tmp_file.write(audio_bytes)
                     tmp_path = tmp_file.name
-                
-                # Convert to text
+
+                # Speech Recognition
                 recognizer = sr.Recognizer()
                 with sr.AudioFile(tmp_path) as source:
                     recognizer.adjust_for_ambient_noise(source, duration=0.5)
                     audio_data = recognizer.record(source)
-                    text = recognizer.recognize_google(audio_data)
-                
-                # Store in session state - THIS IS YOUR OUTPUT
+
+                text = recognizer.recognize_google(audio_data)
+
+                # Update session state
                 st.session_state.transcript = text
                 st.session_state.recording_count += 1
                 
@@ -78,32 +80,34 @@ with col1:
                     "time": datetime.now().strftime("%H:%M:%S"),
                     "text": text
                 })
-                
-                st.success("✅ Conversion complete!")
-                
+
+                st.success("✅ Transcription complete!")
+
             except sr.UnknownValueError:
-                st.error("❌ Could not understand audio")
+                st.error("❌ Could not understand the audio. Please speak more clearly.")
             except sr.RequestError:
-                st.error("❌ Speech recognition service error")
+                st.error("❌ Could not connect to Google Speech Recognition service.")
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"❌ Unexpected error: {str(e)}")
             finally:
-                if os.path.exists(tmp_path):
+                # Clean up temp file
+                if 'tmp_path' in locals() and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
 
 with col2:
-    st.subheader="📝 Current Transcript")
+    st.subheader("📝 Current Transcript")
     
     if st.session_state.transcript:
         edited_text = st.text_area(
-            "Edit if needed:",
+            "You can edit the text below:",
             st.session_state.transcript,
-            height=150
+            height=150,
+            key="transcript_editor"
         )
         
         if edited_text != st.session_state.transcript:
             st.session_state.transcript = edited_text
-        
+
         col_a, col_b = st.columns(2)
         with col_a:
             if st.button("💾 Save to History", use_container_width=True):
@@ -111,66 +115,52 @@ with col2:
                     "time": datetime.now().strftime("%H:%M:%S"),
                     "text": st.session_state.transcript
                 })
-                st.success("Saved!")
+                st.success("Saved to history!")
+
         with col_b:
             st.download_button(
-                label="📥 Download",
+                label="📥 Download as TXT",
                 data=st.session_state.transcript,
-                file_name=f"transcript.txt",
+                file_name=f"transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain",
                 use_container_width=True
             )
     else:
-        st.info("No transcript yet - record something")
+        st.info("Record something to see the transcript here.")
 
-# OUTPUT TESTER - THIS SHOWS YOU THE VALUE
+# ====================== HISTORY ======================
 st.markdown("---")
-st.header="🔍 OUTPUT TESTER")
-
-col_test1, col_test2 = st.columns(2)
-
-with col_test1:
-    st.subheader="Current Value in Session State")
-    st.code(f"st.session_state.transcript = '{st.session_state.transcript}'")
-    st.metric="Character Count", len(st.session_state.transcript))
-
-with col_test2:
-    st.subheader="Verify Output")
-    if st.button("🔴 CLICK TO TEST OUTPUT", use_container_width=True):
-        if st.session_state.transcript:
-            st.success("✅ OUTPUT IS WORKING!")
-            st.json({
-                "transcript": st.session_state.transcript,
-                "length": len(st.session_state.transcript),
-                "in_session_state": True
-            })
-        else:
-            st.warning("⚠️ No transcript yet")
-
-# History
-st.markdown("---")
-st.subheader="📜 History")
+st.subheader("📜 Recent History")
 
 if st.session_state.history:
     for i, item in enumerate(reversed(st.session_state.history[-5:])):
-        with st.expander(f"{item['time']} - {item['text'][:50]}..."):
+        with st.expander(f"🕒 {item['time']} — {item['text'][:60]}..."):
             st.write(item['text'])
-            if st.button(f"Load", key=f"load_{i}"):
+            if st.button("Load into Editor", key=f"load_{i}"):
                 st.session_state.transcript = item['text']
                 st.rerun()
     
-    if st.button("Clear History"):
+    if st.button("🗑️ Clear History"):
         st.session_state.history = []
         st.rerun()
+else:
+    st.info("No recordings in history yet.")
 
-# Footer - shows exactly what your other app will receive
+# ====================== FINAL OUTPUT FOR OTHER APPS ======================
 st.markdown("---")
-st.header="📤 FINAL OUTPUT FOR YOUR OTHER APP")
+st.header("📤 FINAL OUTPUT FOR YOUR OTHER APP")
+
 st.success(f"**st.session_state.transcript =** \"{st.session_state.transcript}\"")
-st.code("""
-# In your other app, just use:
-user_input = st.session_state.transcript
-if user_input:
-    # Process it here
-    print(user_input)
+
+st.code(f"""
+# In your other Streamlit app, simply use:
+
+if "transcript" not in st.session_state:
+    st.session_state.transcript = ""
+
+transcript = st.session_state.transcript
+
+if transcript:
+    st.write("User said:", transcript)
+    # Do your processing here...
 """, language="python")
