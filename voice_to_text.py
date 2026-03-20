@@ -1,6 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import time
 
 st.set_page_config(
     page_title="Speech to Text",
@@ -16,10 +15,7 @@ if "history" not in st.session_state:
 
 st.title("🎤 Speech to Text Converter")
 
-# Create a placeholder for the transcript
-transcript_placeholder = st.empty()
-
-# Simple HTML with form submission
+# HTML with postMessage
 html_code = """
 <div style="text-align: center; padding: 20px;">
     <button onclick="startRecording()" 
@@ -37,10 +33,6 @@ html_code = """
     <div style="border: 2px solid #ddd; border-radius: 10px; padding: 20px; min-height: 150px; background-color: #f9f9f9; font-size: 18px; text-align: left;">
         <div id="transcript"></div>
     </div>
-    
-    <form id="transcriptForm" method="post" action="">
-        <input type="hidden" name="transcript_data" id="transcript_data">
-    </form>
 </div>
 
 <script>
@@ -64,12 +56,10 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         document.getElementById('status').innerHTML = '⏹️ Stopped';
         document.getElementById('status').style.color = '#666';
         
+        // Send the transcript to Streamlit
         if (finalTranscript) {
-            // Store in hidden field
-            document.getElementById('transcript_data').value = finalTranscript.trim();
-            
-            // Submit form
-            document.getElementById('transcriptForm').submit();
+            // Use Streamlit's setComponentValue
+            Streamlit.setComponentValue(finalTranscript.trim());
         }
     };
     
@@ -116,16 +106,15 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader="🎙️ Recording"
-    # Display the component
-    components.html(html_code, height=450)
+    # Get the transcript from the component
+    result = components.html(html_code, height=450)
+    
+    # Update session state if we got a result
+    if result:
+        st.session_state.transcript = result
 
 with col2:
     st.subheader="📝 Your Text"
-    
-    # Get query parameters
-    query_params = st.query_params
-    if "transcript_data" in query_params:
-        st.session_state.transcript = query_params["transcript_data"][0]
     
     if st.session_state.transcript:
         # Show the transcript
@@ -155,7 +144,6 @@ with col2:
         with col_c:
             if st.button("🗑️ Clear", use_container_width=True):
                 st.session_state.transcript = ""
-                st.query_params.clear()
                 st.rerun()
     else:
         st.info("👆 Click 'Start Recording', speak, then click 'Stop Recording'")
