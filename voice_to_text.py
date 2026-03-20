@@ -92,7 +92,7 @@ with col1:
     st.subheader("Current Transcript Value")
     st.code(f"st.session_state.transcript = '{st.session_state.transcript}'")
     
-    st.subheader="How to use in your app")
+    st.subheader("How to use in your app")
     st.code("""
 # In your other app, just use:
 transcript = st.session_state.transcript
@@ -102,7 +102,7 @@ if transcript:
     """, language="python")
 
 with col2:
-    st.subheader="Live Preview")
+    st.subheader("Live Preview")
     if st.session_state.transcript:
         st.success(f"📝 You said: {st.session_state.transcript}")
     else:
