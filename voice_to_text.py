@@ -84,7 +84,7 @@ if result:
 
 # DISPLAY THE OUTPUT CLEARLY
 st.markdown("---")
-st.header="📤 OUTPUT (for your other app)")
+st.header="📤 OUTPUT (for your other app)")  # <--- CHANGE THIS LINE
 
 col1, col2 = st.columns(2)
 
