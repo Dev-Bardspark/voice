@@ -62,14 +62,6 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         document.getElementById('output').innerHTML = 
             '<strong>Final:</strong> ' + finalTranscript + '<br>' +
             '<strong>Interim:</strong> ' + interimTranscript;
-        
-        // Send to Streamlit as a string
-        if (finalTranscript) {
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: String(finalTranscript)
-            }, '*');
-        }
     };
     
     recognition.onerror = function(event) {
@@ -91,6 +83,13 @@ function startRec() {
 function stopRec() {
     if (recognition) {
         recognition.stop();
+        // Send the final transcript to Streamlit
+        if (finalTranscript) {
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: finalTranscript.trim()
+            }, '*');
+        }
     }
 }
 </script>
@@ -101,17 +100,17 @@ col1, col2 = st.columns([3, 2])
 
 with col1:
     st.subheader="🎙️ Recording"
-    # Get transcript from component
-    result = components.html(html, height=400)
-    
-    # Convert to string if we got a result
-    if result is not None:
-        # Ensure it's a string
-        st.session_state.transcript = str(result)
-        st.success("✅ Speech captured!")
+    # Display the component - don't assign to variable
+    components.html(html, height=400)
 
 with col2:
     st.subheader="📝 Current Text"
+    
+    # Get transcript from component value
+    # We need to use a different approach - let's use session state from a callback
+    transcript_value = st.query_params.get("transcript", "")
+    if transcript_value:
+        st.session_state.transcript = transcript_value
     
     # Display current transcript
     if st.session_state.transcript:
@@ -135,10 +134,10 @@ with col2:
                 st.success("Saved!")
         
         with col_b:
-            # Download button - using edited_text directly
+            # Download button
             st.download_button(
                 label="📥 Download",
-                data=edited_text,  # This is now definitely a string
+                data=edited_text,
                 file_name="transcript.txt",
                 mime="text/plain",
                 use_container_width=True
@@ -149,7 +148,7 @@ with col2:
                 st.session_state.transcript = ""
                 st.rerun()
     else:
-        st.info("Click 'Start Recording' and speak")
+        st.info("Click 'Start Recording', speak, then click 'Stop Recording'")
         st.session_state.transcript = ""
 
 # History section
@@ -173,9 +172,9 @@ with st.sidebar:
     1. Click **Start Recording**
     2. Allow microphone access
     3. Speak clearly
-    4. Click **Stop Recording**
-    5. Edit text if needed
-    6. Save or download
+    4. Click **Stop Recording** when done
+    5. Your text will appear on the right
+    6. Edit, save, or download
     """)
     
     st.markdown("---")
