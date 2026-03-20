@@ -1,6 +1,6 @@
 import streamlit as st
 import speech_recognition as sr
-from audio_recorder_streamlit import audio_recorder
+from audio_recorder_streamlit import audio_recorder  # CHANGED THIS LINE
 import tempfile
 import os
 from datetime import datetime
@@ -84,7 +84,7 @@ with st.sidebar:
 col1, col2 = st.columns([3, 2])
 
 with col1:
-    st.markdown("### 🎙️ Recording")
+    st.markdown="### 🎙️ Recording"
     
     # Audio recorder
     audio_bytes = audio_recorder(
