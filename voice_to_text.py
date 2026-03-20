@@ -13,29 +13,34 @@ if "transcript" not in st.session_state:
     st.session_state.transcript = ""
 if "history" not in st.session_state:
     st.session_state.history = []
-if "processing" not in st.session_state:
-    st.session_state.processing = False
 
 st.title("🎤 Speech to Text Converter")
 
-# Custom HTML with better communication
+# Create a placeholder for the transcript
+transcript_placeholder = st.empty()
+
+# Simple HTML with form submission
 html_code = """
 <div style="text-align: center; padding: 20px;">
-    <button id="startBtn" onclick="startRecording()" 
+    <button onclick="startRecording()" 
         style="background-color: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
         🎤 Start Recording
     </button>
     
-    <button id="stopBtn" onclick="stopRecording()" 
+    <button onclick="stopRecording()" 
         style="background-color: #f44336; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
         ⏹️ Stop Recording
     </button>
     
-    <div id="status" style="margin: 20px; font-size: 16px; min-height: 30px;"></div>
+    <div id="status" style="margin: 20px; font-size: 16px;"></div>
     
-    <div style="border: 2px solid #ddd; border-radius: 10px; padding: 20px; min-height: 200px; background-color: #f9f9f9; font-size: 18px; text-align: left;">
+    <div style="border: 2px solid #ddd; border-radius: 10px; padding: 20px; min-height: 150px; background-color: #f9f9f9; font-size: 18px; text-align: left;">
         <div id="transcript"></div>
     </div>
+    
+    <form id="transcriptForm" method="post" action="">
+        <input type="hidden" name="transcript_data" id="transcript_data">
+    </form>
 </div>
 
 <script>
@@ -59,23 +64,12 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         document.getElementById('status').innerHTML = '⏹️ Stopped';
         document.getElementById('status').style.color = '#666';
         
-        // Send the transcript to Streamlit
         if (finalTranscript) {
-            // Create a hidden input to store the transcript
-            let hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.id = 'transcript_data';
-            hiddenInput.value = finalTranscript.trim();
-            document.body.appendChild(hiddenInput);
+            // Store in hidden field
+            document.getElementById('transcript_data').value = finalTranscript.trim();
             
-            // Trigger a change event
-            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            // Also send via postMessage
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: finalTranscript.trim()
-            }, '*');
+            // Submit form
+            document.getElementById('transcriptForm').submit();
         }
     };
     
@@ -123,16 +117,15 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader="🎙️ Recording"
     # Display the component
-    transcript_value = components.html(html_code, height=450)
-    
-    # Check if we got a value
-    if transcript_value:
-        st.session_state.transcript = transcript_value
-        st.session_state.processing = True
-        st.rerun()
+    components.html(html_code, height=450)
 
 with col2:
     st.subheader="📝 Your Text"
+    
+    # Get query parameters
+    query_params = st.query_params
+    if "transcript_data" in query_params:
+        st.session_state.transcript = query_params["transcript_data"][0]
     
     if st.session_state.transcript:
         # Show the transcript
@@ -148,7 +141,7 @@ with col2:
         with col_a:
             if st.button("💾 Save", use_container_width=True):
                 st.session_state.history.append(edited_text)
-                st.success("Saved to history!")
+                st.success("✅ Saved to history!")
         
         with col_b:
             st.download_button(
@@ -162,10 +155,10 @@ with col2:
         with col_c:
             if st.button("🗑️ Clear", use_container_width=True):
                 st.session_state.transcript = ""
-                st.session_state.processing = False
+                st.query_params.clear()
                 st.rerun()
     else:
-        st.info("👆 Click 'Start Recording' in the left panel, speak, then click 'Stop Recording'")
+        st.info("👆 Click 'Start Recording', speak, then click 'Stop Recording'")
 
 # History section
 st.markdown("---")
@@ -188,8 +181,8 @@ with st.sidebar:
     1. Click **Start Recording**
     2. Allow microphone access
     3. Speak clearly
-    4. Click **Stop Recording** when done
-    5. Your text will appear on the right
+    4. Click **Stop Recording**
+    5. Your text appears on the right
     6. Edit, save, or download
     """)
     
