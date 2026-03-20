@@ -1,4 +1,6 @@
-streamlit>=1.28.0
-SpeechRecognition>=3.10.0
+streamlit>=1.35.0
 pydub>=0.25.1
-pocketsphinx>=5.0.1  # Optional for offline recognition
+SpeechRecognition>=3.10.0
+pocketsphinx>=5.0.1
+assemblyai>=0.8.0
+openai-whisper>=20231117
