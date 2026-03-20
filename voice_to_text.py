@@ -1,6 +1,6 @@
 import streamlit as st
 import speech_recognition as sr
-from audio_recorder_streamlit import audio_recorder  # CHANGED THIS LINE
+from streamlit_audio_recorder import audio_recorder
 import tempfile
 import os
 from datetime import datetime
