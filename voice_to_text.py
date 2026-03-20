@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import time
 
 st.set_page_config(
     page_title="Speech to Text",
@@ -12,20 +13,29 @@ if "transcript" not in st.session_state:
     st.session_state.transcript = ""
 if "history" not in st.session_state:
     st.session_state.history = []
+if "processing" not in st.session_state:
+    st.session_state.processing = False
 
 st.title("🎤 Speech to Text Converter")
 
-# Simple speech recognition HTML
-html = """
+# Custom HTML with better communication
+html_code = """
 <div style="text-align: center; padding: 20px;">
-    <button onclick="startRec()" style="background: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
+    <button id="startBtn" onclick="startRecording()" 
+        style="background-color: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
         🎤 Start Recording
     </button>
-    <button onclick="stopRec()" style="background: #f44336; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
+    
+    <button id="stopBtn" onclick="stopRecording()" 
+        style="background-color: #f44336; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; margin: 10px; cursor: pointer;">
         ⏹️ Stop Recording
     </button>
-    <p id="status" style="font-size: 16px; margin: 10px;"></p>
-    <div id="output" style="border: 2px solid #ddd; border-radius: 10px; padding: 20px; min-height: 150px; background: #f9f9f9; font-size: 18px; text-align: left;"></div>
+    
+    <div id="status" style="margin: 20px; font-size: 16px; min-height: 30px;"></div>
+    
+    <div style="border: 2px solid #ddd; border-radius: 10px; padding: 20px; min-height: 200px; background-color: #f9f9f9; font-size: 18px; text-align: left;">
+        <div id="transcript"></div>
+    </div>
 </div>
 
 <script>
@@ -42,11 +52,31 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onstart = function() {
         document.getElementById('status').innerHTML = '🎤 Listening...';
         document.getElementById('status').style.color = '#4CAF50';
+        document.getElementById('transcript').innerHTML = '';
     };
     
     recognition.onend = function() {
         document.getElementById('status').innerHTML = '⏹️ Stopped';
         document.getElementById('status').style.color = '#666';
+        
+        // Send the transcript to Streamlit
+        if (finalTranscript) {
+            // Create a hidden input to store the transcript
+            let hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.id = 'transcript_data';
+            hiddenInput.value = finalTranscript.trim();
+            document.body.appendChild(hiddenInput);
+            
+            // Trigger a change event
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // Also send via postMessage
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: finalTranscript.trim()
+            }, '*');
+        }
     };
     
     recognition.onresult = function(event) {
@@ -59,7 +89,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                 interimTranscript += transcript;
             }
         }
-        document.getElementById('output').innerHTML = 
+        document.getElementById('transcript').innerHTML = 
             '<strong>Final:</strong> ' + finalTranscript + '<br>' +
             '<strong>Interim:</strong> ' + interimTranscript;
     };
@@ -72,54 +102,44 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     document.getElementById('status').innerHTML = '❌ Speech recognition not supported. Please use Chrome.';
 }
 
-function startRec() {
+function startRecording() {
     if (recognition) {
         finalTranscript = '';
-        document.getElementById('output').innerHTML = '';
         recognition.start();
     }
 }
 
-function stopRec() {
+function stopRecording() {
     if (recognition) {
         recognition.stop();
-        // Send the final transcript to Streamlit
-        if (finalTranscript) {
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: finalTranscript.trim()
-            }, '*');
-        }
     }
 }
 </script>
 """
 
 # Layout
-col1, col2 = st.columns([3, 2])
+col1, col2 = st.columns(2)
 
 with col1:
     st.subheader="🎙️ Recording"
-    # Display the component - don't assign to variable
-    components.html(html, height=400)
-
-with col2:
-    st.subheader="📝 Current Text"
+    # Display the component
+    transcript_value = components.html(html_code, height=450)
     
-    # Get transcript from component value
-    # We need to use a different approach - let's use session state from a callback
-    transcript_value = st.query_params.get("transcript", "")
+    # Check if we got a value
     if transcript_value:
         st.session_state.transcript = transcript_value
+        st.session_state.processing = True
+        st.rerun()
+
+with col2:
+    st.subheader="📝 Your Text"
     
-    # Display current transcript
     if st.session_state.transcript:
-        # Text area for display/editing
+        # Show the transcript
         edited_text = st.text_area(
             "Edit if needed:",
             st.session_state.transcript,
-            height=150,
-            key="edit_area"
+            height=200
         )
         
         # Buttons
@@ -127,14 +147,10 @@ with col2:
         
         with col_a:
             if st.button("💾 Save", use_container_width=True):
-                st.session_state.history.append({
-                    "text": edited_text,
-                    "time": "Just now"
-                })
-                st.success("Saved!")
+                st.session_state.history.append(edited_text)
+                st.success("Saved to history!")
         
         with col_b:
-            # Download button
             st.download_button(
                 label="📥 Download",
                 data=edited_text,
@@ -146,28 +162,28 @@ with col2:
         with col_c:
             if st.button("🗑️ Clear", use_container_width=True):
                 st.session_state.transcript = ""
+                st.session_state.processing = False
                 st.rerun()
     else:
-        st.info("Click 'Start Recording', speak, then click 'Stop Recording'")
-        st.session_state.transcript = ""
+        st.info("👆 Click 'Start Recording' in the left panel, speak, then click 'Stop Recording'")
 
 # History section
 st.markdown("---")
 st.subheader="📜 History"
 
 if st.session_state.history:
-    for i, item in enumerate(reversed(st.session_state.history[-10:])):
-        with st.expander(f"{item['time']} - {item['text'][:50]}..."):
-            st.write(item['text'])
+    for i, text in enumerate(reversed(st.session_state.history[-10:])):
+        with st.expander(f"Recording {len(st.session_state.history) - i} - {text[:50]}..."):
+            st.write(text)
             if st.button("Load", key=f"load_{i}"):
-                st.session_state.transcript = item['text']
+                st.session_state.transcript = text
                 st.rerun()
 else:
     st.info("No saved transcripts yet")
 
 # Sidebar
 with st.sidebar:
-    st.header="ℹ️ How to use"
+    st.header="ℹ️ Instructions"
     st.markdown("""
     1. Click **Start Recording**
     2. Allow microphone access
@@ -179,3 +195,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.metric("Total Recordings", len(st.session_state.history))
+    
+    if st.button("Clear All History"):
+        st.session_state.history = []
+        st.rerun()
