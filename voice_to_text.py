@@ -1,13 +1,13 @@
 import streamlit as st
 import speech_recognition as sr
 from audio_recorder_streamlit import audio_recorder
+from pydub import AudioSegment
 import tempfile
 import os
 from datetime import datetime
 
 st.set_page_config(page_title="Speech to Text", page_icon="🎤", layout="wide")
 
-# Session State
 if "transcript" not in st.session_state:
     st.session_state.transcript = ""
 if "history" not in st.session_state:
@@ -22,7 +22,6 @@ with st.sidebar:
     st.header("📊 Stats")
     st.metric("Total Recordings", st.session_state.recording_count)
     st.metric("Transcript Length", len(st.session_state.transcript))
-    st.info("Speak continuously.\nIt now waits ~10 seconds before stopping.")
 
 col1, col2 = st.columns(2)
 
@@ -34,12 +33,11 @@ with col1:
         st.rerun()
 
     audio_bytes = audio_recorder(
-        text="Click to record • Speak naturally",
+        text="Click to record",
         recording_color="#ff4b4b",
         neutral_color="#6c757d",
         icon_size="4x",
-        pause_threshold=10.0,          # Longer pause tolerance
-        energy_threshold=(-0.6, 1.0)
+        pause_threshold=8.0
     )
 
     if audio_bytes:
@@ -47,13 +45,16 @@ with col1:
 
         with st.spinner("Converting to text..."):
             try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-                    tmp_file.write(audio_bytes)
-                    tmp_path = tmp_file.name
+                # === FORCE CLEAN AUDIO - This is the key fix ===
+                audio = AudioSegment.from_file(tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name)
+                audio = audio.set_frame_rate(16000).set_channels(1).normalize()
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+                    clean_path = f.name
+                    audio.export(clean_path, format="wav")
 
                 recognizer = sr.Recognizer()
-                with sr.AudioFile(tmp_path) as source:
-                    recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                with sr.AudioFile(clean_path) as source:
                     audio_data = recognizer.record(source)
 
                 text = recognizer.recognize_google(audio_data)
@@ -65,20 +66,20 @@ with col1:
                     "text": text
                 })
 
-                st.success("✅ Conversion complete! Use 'Clear & Start Again' for new recording.")
+                st.success("✅ Conversion complete!")
 
             except sr.UnknownValueError:
-                st.error("❌ Could not understand audio. Speak louder and clearer.")
+                st.error("❌ Could not understand audio")
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"❌ Error: {e}")
             finally:
-                if 'tmp_path' in locals() and os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+                if 'clean_path' in locals() and os.path.exists(clean_path):
+                    os.unlink(clean_path)
 
 with col2:
     st.subheader("📝 Current Transcript")
     if st.session_state.transcript:
-        edited_text = st.text_area("Edit if needed:", st.session_state.transcript, height=160)
+        edited_text = st.text_area("Edit if needed:", st.session_state.transcript, height=150)
         if edited_text != st.session_state.transcript:
             st.session_state.transcript = edited_text
 
@@ -92,22 +93,10 @@ with col2:
                 st.success("Saved!")
         with c2:
             st.download_button("📥 Download", st.session_state.transcript,
-                               f"transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                               f"transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                                "text/plain", use_container_width=True)
-    else:
-        st.info("Record on the left side")
 
-# History + Final Output
-st.markdown("---")
-st.subheader("📜 History")
-if st.session_state.history:
-    for i, item in enumerate(reversed(st.session_state.history[-5:])):
-        with st.expander(f"{item['time']} — {item['text'][:60]}..."):
-            st.write(item['text'])
-            if st.button("Load", key=f"load_{i}"):
-                st.session_state.transcript = item['text']
-                st.rerun()
-
+# Final Output Section
 st.markdown("---")
 st.header("📤 FINAL OUTPUT FOR YOUR OTHER APP")
 st.success(f"**st.session_state.transcript =** \"{st.session_state.transcript}\"")
