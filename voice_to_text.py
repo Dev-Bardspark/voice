@@ -42,14 +42,20 @@ with col1:
 
         with st.spinner("Cleaning audio + transcribing..."):
             try:
+                # === FIXED TEMP FILE HANDLING ===
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+                    tmp.write(audio_bytes)
+                    raw_path = tmp.name
+
                 # Clean and normalize audio
-                audio = AudioSegment.from_file(tempfile.NamedTemporaryFile(suffix=".webm").name)
+                audio = AudioSegment.from_file(raw_path)
                 audio = audio.set_frame_rate(16000).set_channels(1).normalize()
 
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    clean_path = f.name
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as clean:
+                    clean_path = clean.name
                     audio.export(clean_path, format="wav")
 
+                # Transcribe
                 recognizer = sr.Recognizer()
                 with sr.AudioFile(clean_path) as source:
                     audio_data = recognizer.record(source)
@@ -68,10 +74,12 @@ with col1:
             except sr.UnknownValueError:
                 st.error("❌ Could not understand audio")
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Error: {str(e)}")
             finally:
-                if 'clean_path' in locals() and os.path.exists(clean_path):
-                    os.unlink(clean_path)
+                # Clean up temp files
+                for path in [raw_path, clean_path] if 'raw_path' in locals() else []:
+                    if os.path.exists(path):
+                        os.unlink(path)
 
 with col2:
     st.subheader("📝 Current Transcript")
@@ -98,3 +106,4 @@ with col2:
 st.markdown("---")
 st.header("📤 FINAL OUTPUT FOR YOUR OTHER APP")
 st.success(f"**st.session_state.transcript =** \"{st.session_state.transcript}\"")
+st.code("transcript = st.session_state.transcript", language="python")
